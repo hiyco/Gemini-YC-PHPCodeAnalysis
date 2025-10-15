@@ -1,58 +1,13 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-    "removeComments": false,
-    "noImplicitAny": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
-    "exactOptionalPropertyTypes": false,
-    "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types"
-    ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@/protocol/*": ["./src/protocol/*"],
-      "@/context/*": ["./src/context/*"],
-      "@/plugins/*": ["./src/plugins/*"],
-      "@/performance/*": ["./src/performance/*"],
-      "@/security/*": ["./src/security/*"],
-      "@/utils/*": ["./src/utils/*"]
-    }
+    "outDir": "./dist"
   },
-  "include": [
-    "src/**/*",
-    "tests/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "coverage",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ],
-  "ts-node": {
-    "esm": false,
-    "files": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  "include": ["index.ts"]
 }

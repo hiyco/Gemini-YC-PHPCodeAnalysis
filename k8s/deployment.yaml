@@ -1,0 +1,347 @@
+# Kubernetes Deployment for YC-PHP-Code-Analysis MCP Server
+# Copyright: YC-2025Copyright
+# Description: Production-ready Kubernetes deployment with auto-scaling and monitoring
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: yc-php-analysis
+  labels:
+    app.kubernetes.io/name: yc-php-analysis
+    app.kubernetes.io/version: "1.0.0"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: yc-php-analysis-config
+  namespace: yc-php-analysis
+data:
+  config.json: |
+    {
+      "server": {
+        "port": 3000,
+        "host": "0.0.0.0",
+        "maxConnections": 1000,
+        "timeout": 30000
+      },
+      "analysis": {
+        "types": ["syntax", "security", "performance", "quality"],
+        "cache": {
+          "enabled": true,
+          "maxSize": "256MB",
+          "ttl": 3600
+        },
+        "workers": {
+          "enabled": true,
+          "maxWorkers": 4
+        }
+      },
+      "security": {
+        "enabled": true,
+        "rateLimit": {
+          "windowMs": 900000,
+          "max": 1000
+        }
+      },
+      "monitoring": {
+        "enabled": true,
+        "metrics": {
+          "port": 9090,
+          "path": "/metrics"
+        },
+        "healthcheck": {
+          "port": 3000,
+          "path": "/health"
+        }
+      }
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: yc-php-analysis-secrets
+  namespace: yc-php-analysis
+type: Opaque
+data:
+  jwt-secret: eW91ci1zdXBlci1zZWNyZXQta2V5LWhlcmU=
+  redis-password: cmVkaXMxMjM=
+  postgres-password: cG9zdGdyZXMxMjM=
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yc-php-analysis-mcp
+  namespace: yc-php-analysis
+  labels:
+    app: yc-php-analysis-mcp
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 2
+  selector:
+    matchLabels:
+      app: yc-php-analysis-mcp
+  template:
+    metadata:
+      labels:
+        app: yc-php-analysis-mcp
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: mcp-server
+        image: ghcr.io/yc-2025/php-code-analysis-mcp-server:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: MCP_PORT
+          value: "3000"
+        - name: MCP_HOST
+          value: "0.0.0.0"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: yc-php-analysis-secrets
+              key: jwt-secret
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: yc-php-analysis-secrets
+              key: redis-password
+        - name: REDIS_HOST
+          value: "redis-service.yc-php-analysis.svc.cluster.local"
+        - name: POSTGRES_HOST
+          value: "postgres-service.yc-php-analysis.svc.cluster.local"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: yc-php-analysis-secrets
+              key: postgres-password
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi" 
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+      volumes:
+      - name: config
+        configMap:
+          name: yc-php-analysis-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: yc-php-analysis-data
+      - name: logs
+        persistentVolumeClaim:
+          claimName: yc-php-analysis-logs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yc-php-analysis-service
+  namespace: yc-php-analysis
+  labels:
+    app: yc-php-analysis-mcp
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: yc-php-analysis-mcp
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yc-php-analysis-loadbalancer
+  namespace: yc-php-analysis
+  labels:
+    app: yc-php-analysis-mcp
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: yc-php-analysis-mcp
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: yc-php-analysis-hpa
+  namespace: yc-php-analysis
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: yc-php-analysis-mcp
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yc-php-analysis-data
+  namespace: yc-php-analysis
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yc-php-analysis-logs
+  namespace: yc-php-analysis
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yc-php-analysis-network-policy
+  namespace: yc-php-analysis
+spec:
+  podSelector:
+    matchLabels:
+      app: yc-php-analysis-mcp
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: yc-php-analysis
+    ports:
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 80   # HTTP

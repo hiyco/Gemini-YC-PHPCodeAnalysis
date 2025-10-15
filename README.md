@@ -1,8 +1,6 @@
-# YC-PHPCodeAnalysis&MCP
+# Gemini-YC-PHPCodeAnalysis
 
 <div align="center">
-  <img src="YC-PHPCode-mcp-logo.png" alt="YC-PHPCodeAnalysis&MCP Logo" width="300">
-
 
 **Languages:** [English](README-EN.md) | [简体中文](README.md)
 
@@ -17,14 +15,14 @@
 
 ## 🎯 项目概述
 
-**YC-PHPCodeAnalysis&MCP** 是一个集成了完整 MCP (Model Context Protocol) SDK 的专业级PHP代码分析平台。它不仅提供传统的代码质量检查功能，还集成了主流AI大模型，支持智能代码分析、AI驱动的代码审查和自动化代码优化建议。
+**Gemini-YC-PHPCodeAnalysis** 是一个基Gemini CLi 工具扩展集成了完整 MCP (Model Context Protocol) SDK 的专业级PHP代码分析平台。它不仅提供传统的代码质量检查功能，还集成了主流AI大模型，支持智能代码分析、AI驱动的代码审查和自动化代码优化建议,
 
 ### ✨ 核心特性
 
 **🔍 传统代码分析能力：**
 - **AST解析器** - 基于nikic/php-parser的高性能抽象语法树解析
 - **安全审计** - OWASP Top 10漏洞检测，支持SQL注入、XSS等
-- **性能分析** - 内置基准测试系统，支持性能回归检测  
+- **性能分析** - 内置基准测试系统，支持性能回归检测
 - **代码质量** - 语法检查、复杂度分析、最佳实践检测
 - **高性能** - LRU缓存、并行处理、大文件优化
 

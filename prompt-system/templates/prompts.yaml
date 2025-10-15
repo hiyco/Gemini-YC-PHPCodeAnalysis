@@ -1,0 +1,201 @@
+# 提示词模板配置
+
+templates:
+  # 安全分析模板
+  security:
+    zh:
+      title: "PHP安全漏洞分析"
+      structure:
+        - role: "作为安全专家，请分析以下PHP代码中的安全问题"
+        - context: "代码位置：{file}，行号：{line_range}"
+        - code_block: "{code_snippet}"
+        - issues: "已检测到的问题：{issues_list}"
+        - task: |
+            请完成以下分析：
+            1. 确认并解释每个安全漏洞的原理
+            2. 评估潜在的攻击向量和影响范围
+            3. 提供具体的修复代码示例
+            4. 建议额外的安全防护措施
+        - priority: "请按照CVSS评分标准对问题进行优先级排序"
+    en:
+      title: "PHP Security Analysis"
+      structure:
+        - role: "As a security expert, analyze the following PHP code for vulnerabilities"
+        - context: "File: {file}, Lines: {line_range}"
+        - code_block: "{code_snippet}"
+        - issues: "Detected issues: {issues_list}"
+        - task: |
+            Please complete the following analysis:
+            1. Confirm and explain each security vulnerability
+            2. Assess potential attack vectors and impact
+            3. Provide specific code fixes
+            4. Suggest additional security measures
+        - priority: "Prioritize issues based on CVSS scoring"
+
+  # 性能优化模板
+  performance:
+    zh:
+      title: "PHP性能优化分析"
+      structure:
+        - role: "作为性能优化专家，分析以下代码的性能瓶颈"
+        - metrics: |
+            当前性能指标：
+            - 执行时间：{execution_time}
+            - 内存使用：{memory_usage}
+            - 数据库查询：{query_count}
+        - bottlenecks: "识别的瓶颈：{bottleneck_list}"
+        - task: |
+            请提供优化建议：
+            1. 算法优化方案
+            2. 数据库查询优化
+            3. 缓存策略建议
+            4. 代码重构建议
+        - expected_improvement: "预期性能提升评估"
+    en:
+      title: "PHP Performance Optimization"
+      structure:
+        - role: "As a performance expert, analyze performance bottlenecks"
+        - metrics: |
+            Current metrics:
+            - Execution time: {execution_time}
+            - Memory usage: {memory_usage}
+            - Database queries: {query_count}
+        - bottlenecks: "Identified bottlenecks: {bottleneck_list}"
+        - task: |
+            Please provide optimization suggestions:
+            1. Algorithm optimization
+            2. Database query optimization
+            3. Caching strategies
+            4. Code refactoring
+        - expected_improvement: "Expected performance improvement"
+
+  # 代码重构模板
+  refactoring:
+    zh:
+      title: "PHP代码重构建议"
+      structure:
+        - role: "作为代码架构师，评估代码质量并提供重构建议"
+        - code_smells: "代码异味：{smell_list}"
+        - complexity: "复杂度指标：圈复杂度={cyclomatic}，认知复杂度={cognitive}"
+        - task: |
+            重构建议：
+            1. 设计模式应用
+            2. SOLID原则改进
+            3. 代码组织优化
+            4. 测试覆盖率提升
+        - patterns: "推荐的设计模式：{pattern_suggestions}"
+    en:
+      title: "PHP Code Refactoring"
+      structure:
+        - role: "As a code architect, assess code quality and suggest refactoring"
+        - code_smells: "Code smells: {smell_list}"
+        - complexity: "Complexity: Cyclomatic={cyclomatic}, Cognitive={cognitive}"
+        - task: |
+            Refactoring suggestions:
+            1. Design pattern application
+            2. SOLID principle improvements
+            3. Code organization
+            4. Test coverage enhancement
+        - patterns: "Recommended patterns: {pattern_suggestions}"
+
+  # 依赖管理模板
+  dependency:
+    zh:
+      title: "PHP依赖管理分析"
+      structure:
+        - role: "分析项目依赖关系和潜在问题"
+        - dependencies: "当前依赖：{dependency_tree}"
+        - conflicts: "版本冲突：{conflict_list}"
+        - vulnerabilities: "已知漏洞：{vuln_list}"
+        - task: |
+            请提供：
+            1. 依赖更新策略
+            2. 安全补丁建议
+            3. 架构解耦方案
+            4. 替代库推荐
+    en:
+      title: "PHP Dependency Management"
+      structure:
+        - role: "Analyze project dependencies and potential issues"
+        - dependencies: "Current dependencies: {dependency_tree}"
+        - conflicts: "Version conflicts: {conflict_list}"
+        - vulnerabilities: "Known vulnerabilities: {vuln_list}"
+        - task: |
+            Please provide:
+            1. Dependency update strategy
+            2. Security patch recommendations
+            3. Architecture decoupling
+            4. Alternative library suggestions
+
+# 示例代码库
+examples:
+  sql_injection:
+    bad: |
+      $query = "SELECT * FROM users WHERE id = " . $_GET['id'];
+      $result = mysqli_query($conn, $query);
+    good: |
+      $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+      $stmt->bind_param("i", $_GET['id']);
+      $stmt->execute();
+      $result = $stmt->get_result();
+    
+  xss:
+    bad: |
+      echo "Welcome " . $_GET['username'];
+    good: |
+      echo "Welcome " . htmlspecialchars($_GET['username'], ENT_QUOTES, 'UTF-8');
+  
+  performance_loop:
+    bad: |
+      foreach ($items as $item) {
+          $user = DB::table('users')->find($item->user_id);
+          // N+1 problem
+      }
+    good: |
+      $userIds = array_column($items, 'user_id');
+      $users = DB::table('users')->whereIn('id', $userIds)->get()->keyBy('id');
+      foreach ($items as $item) {
+          $user = $users[$item->user_id];
+      }
+
+# 严重性定义
+severity_definitions:
+  critical:
+    score: 9.0-10.0
+    description: "立即需要修复，可能导致系统被完全控制"
+    color: "#FF0000"
+    
+  high:
+    score: 7.0-8.9
+    description: "高优先级，可能导致数据泄露或服务中断"
+    color: "#FF6600"
+    
+  medium:
+    score: 4.0-6.9
+    description: "中等优先级，在特定条件下可能被利用"
+    color: "#FFCC00"
+    
+  low:
+    score: 0.1-3.9
+    description: "低优先级，影响有限但应该修复"
+    color: "#00CC00"
+
+# AI工具特定配置
+ai_tools:
+  claude:
+    preferred_format: "xml"
+    max_context_length: 100000
+    supports_images: true
+    supports_code_execution: false
+    
+  gpt:
+    preferred_format: "markdown"
+    max_context_length: 8192
+    supports_images: true
+    supports_code_execution: true
+    
+  copilot:
+    preferred_format: "comment"
+    max_context_length: 4096
+    supports_images: false
+    supports_code_execution: false

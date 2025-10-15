@@ -1,0 +1,327 @@
+{
+  "name": "yc-php-code-analysis",
+  "displayName": "YC PHP Code Analysis",
+  "description": "专业的PHP代码分析工具，提供安全扫描和性能优化 | Professional PHP code analysis with security scanning and performance optimization",
+  "version": "1.0.3",
+  "publisher": "HIYCO",
+  "icon": "yc-php-code.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "php",
+    "code-analysis",
+    "security",
+    "performance",
+    "owasp",
+    "static-analysis",
+    "vulnerability-scanner"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "php",
+        "aliases": [
+          "PHP",
+          "php"
+        ],
+        "extensions": [
+          ".php"
+        ]
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "YC PHP Code Analysis",
+      "properties": {
+        "yc-pca.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable YC-PCA extension"
+        },
+        "yc-pca.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to YC-PCA executable (optional, will auto-detect)"
+        },
+        "yc-pca.phpVersion": {
+          "type": "string",
+          "default": "8.3",
+          "enum": [
+            "8.0",
+            "8.1",
+            "8.2",
+            "8.3"
+          ],
+          "description": "Target PHP version for analysis"
+        },
+        "yc-pca.securityEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable security vulnerability scanning"
+        },
+        "yc-pca.performanceEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable performance analysis"
+        },
+        "yc-pca.minimumSeverity": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "info",
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "description": "Minimum severity level to show"
+        },
+        "yc-pca.excludePatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "vendor/**",
+            "node_modules/**",
+            "*.min.php"
+          ],
+          "description": "File patterns to exclude from analysis"
+        },
+        "yc-pca.analysisTimeout": {
+          "type": "number",
+          "default": 30,
+          "description": "Analysis timeout in seconds"
+        },
+        "yc-pca.enableBenchmarks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable performance benchmark integration"
+        },
+        "yc-pca.highlightingEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable security issue highlighting in editor"
+        },
+        "yc-pca.hoverEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable security issue hover tooltips"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "yc-pca.analyzeFile",
+        "title": "Analyze Current File",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.analyzeWorkspace",
+        "title": "Analyze Entire Workspace",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.runBenchmarks",
+        "title": "Run Performance Benchmarks",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.generateReport",
+        "title": "Generate Analysis Report",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.clearDiagnostics",
+        "title": "Clear All Diagnostics",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.showSecurityPanel",
+        "title": "Show Security Issues",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.toggleHighlighting",
+        "title": "Toggle Security Highlighting",
+        "category": "YC-PCA"
+      },
+      {
+        "command": "yc-pca.refreshDecorations",
+        "title": "Refresh Security Decorations",
+        "category": "YC-PCA"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "yc-pca.analyzeFile",
+          "when": "resourceExtname == .php",
+          "group": "yc-pca"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "yc-pca.analyzeFile",
+          "when": "resourceExtname == .php",
+          "group": "yc-pca"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "yc-pca.analyzeFile",
+          "when": "resourceExtname == .php"
+        },
+        {
+          "command": "yc-pca.analyzeWorkspace"
+        },
+        {
+          "command": "yc-pca.runBenchmarks"
+        },
+        {
+          "command": "yc-pca.generateReport"
+        },
+        {
+          "command": "yc-pca.clearDiagnostics"
+        },
+        {
+          "command": "yc-pca.showSecurityPanel"
+        },
+        {
+          "command": "yc-pca.toggleHighlighting"
+        },
+        {
+          "command": "yc-pca.refreshDecorations"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "yc-pca-security",
+          "name": "Security Issues",
+          "when": "yc-pca.securityEnabled"
+        },
+        {
+          "id": "yc-pca-performance",
+          "name": "Performance Issues",
+          "when": "yc-pca.performanceEnabled"
+        },
+        {
+          "id": "yc-pca-benchmarks",
+          "name": "Benchmarks",
+          "when": "yc-pca.enableBenchmarks"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "yc-pca",
+          "title": "YC PHP Analysis",
+          "icon": "$(shield)"
+        }
+      ]
+    },
+    "problemMatchers": [
+      {
+        "name": "yc-pca",
+        "owner": "yc-pca",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|info):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "yc-pca",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Analysis target (file or directory)"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "console",
+              "json",
+              "xml"
+            ],
+            "default": "console"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "default": "info"
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "@vscode/test-electron": "^2.3.4",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.50.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.8"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hiyco/YC-PHPCodeAnalysis-MCP.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hiyco/YC-PHPCodeAnalysis-MCP/issues"
+  },
+  "homepage": "https://github.com/hiyco/YC-PHPCodeAnalysis-MCP#readme",
+  "license": "MIT"
+}

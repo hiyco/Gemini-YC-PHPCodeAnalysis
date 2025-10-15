@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.4/phpunit.xsd"
+         bootstrap="tests/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache"
+         processIsolation="false"
+         stopOnFailure="false"
+         failOnRisky="true"
+         failOnWarning="true">
+    
+    <!-- Test suites definition -->
+    <testsuites>
+        <testsuite name="Unit Tests">
+            <directory suffix="Test.php">tests/Unit</directory>
+        </testsuite>
+        
+        <testsuite name="Integration Tests">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+        
+        <testsuite name="Feature Tests">
+            <directory suffix="Test.php">tests/Feature</directory>
+        </testsuite>
+        
+        <testsuite name="Performance Tests">
+            <directory suffix="Test.php">tests/Performance</directory>
+        </testsuite>
+        
+        <testsuite name="MCP Tests">
+            <directory suffix="Test.php">tests/Mcp</directory>
+        </testsuite>
+    </testsuites>
+    
+    <!-- Source code coverage -->
+    <source>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <directory>src/Cli</directory>
+            <file>src/Analysis/Issue/Issue.php</file>
+        </exclude>
+    </source>
+    
+    <!-- Coverage reports -->
+    <coverage>
+        <report>
+            <html outputDirectory="coverage/html"/>
+            <clover outputFile="coverage/clover.xml"/>
+            <text outputFile="coverage/coverage.txt"/>
+            <xml outputDirectory="coverage/xml"/>
+        </report>
+    </coverage>
+    
+    <!-- Logging configuration -->
+    <logging>
+        <junit outputFile="tests/logs/junit.xml"/>
+        <teamcity outputFile="tests/logs/teamcity.txt"/>
+        <testdoxHtml outputFile="tests/logs/testdox.html"/>
+        <testdoxText outputFile="tests/logs/testdox.txt"/>
+    </logging>
+    
+    <!-- PHP configuration -->
+    <php>
+        <ini name="display_errors" value="1"/>
+        <ini name="error_reporting" value="-1"/>
+        <ini name="memory_limit" value="512M"/>
+        <server name="SHELL_VERBOSITY" value="-1"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="PCA_TEST_MODE" value="true"/>
+    </php>
+    
+    <!-- Extensions configuration -->
+    <extensions>
+        <!-- Add extensions here if needed -->
+    </extensions>
+</phpunit>

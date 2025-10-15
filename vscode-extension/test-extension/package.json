@@ -1,0 +1,27 @@
+{
+  "name": "yc-test-extension",
+  "displayName": "YC Test Extension",
+  "description": "Simple test extension to verify command registration",
+  "version": "1.0.0",
+  "publisher": "HIYCO",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["*"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "yc-test.hello",
+        "title": "Hello World",
+        "category": "YC-Test"
+      },
+      {
+        "command": "yc-test.refresh",
+        "title": "Test Refresh",
+        "category": "YC-Test"
+      }
+    ]
+  }
+}

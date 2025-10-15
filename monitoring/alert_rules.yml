@@ -1,0 +1,237 @@
+# Alert Rules for YC-PHP-Code-Analysis MCP Server
+# Copyright: YC-2025Copyright
+# Description: Comprehensive alerting rules for production monitoring
+
+groups:
+  - name: yc-php-analysis.alerts
+    rules:
+      # Service Availability Alerts
+      - alert: MCPServerDown
+        expr: up{job="yc-php-analysis-mcp"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: mcp-server
+          team: infrastructure
+        annotations:
+          summary: "YC PHP Analysis MCP Server is down"
+          description: "MCP Server {{ $labels.instance }} has been down for more than 1 minute."
+          runbook_url: "https://docs.yc-2025.com/runbooks/mcp-server-down"
+          action: "Check server logs and restart if necessary"
+
+      - alert: MCPServerHighLatency
+        expr: histogram_quantile(0.95, rate(php_analysis_request_duration_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: performance
+        annotations:
+          summary: "High request latency on MCP Server"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/high-latency"
+          action: "Check server performance and scale if needed"
+
+      - alert: MCPServerErrorRate
+        expr: rate(php_analysis_error_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: development
+        annotations:
+          summary: "High error rate on MCP Server"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/high-error-rate"
+          action: "Check application logs for error patterns"
+
+      # Resource Usage Alerts
+      - alert: MCPServerHighMemoryUsage
+        expr: (php_analysis_memory_usage_bytes / 1024 / 1024 / 1024) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: infrastructure
+        annotations:
+          summary: "High memory usage on MCP Server"
+          description: "Memory usage is {{ $value | humanize }}GB on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/high-memory-usage"
+          action: "Check for memory leaks and consider scaling"
+
+      - alert: MCPServerHighCPUUsage
+        expr: php_analysis_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: infrastructure
+        annotations:
+          summary: "High CPU usage on MCP Server"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/high-cpu-usage"
+          action: "Check for CPU-intensive operations and consider scaling"
+
+      - alert: MCPServerDiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: infrastructure
+        annotations:
+          summary: "Low disk space on MCP Server"
+          description: "Disk space is {{ $value | humanizePercentage }} available on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/low-disk-space"
+          action: "Clean up logs and temporary files, expand storage"
+
+      # Security Alerts
+      - alert: SecurityVulnerabilityFound
+        expr: increase(security_vulnerability_found_total[1h]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: mcp-server
+          team: security
+        annotations:
+          summary: "Security vulnerability detected"
+          description: "{{ $value }} new vulnerabilities found in the last hour"
+          runbook_url: "https://docs.yc-2025.com/runbooks/security-vulnerability"
+          action: "Review security scan results and apply patches immediately"
+
+      - alert: AuthenticationFailureSpike
+        expr: rate(authentication_failure_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failures at {{ $value }}/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/auth-failures"
+          action: "Investigate potential brute force attack"
+
+      - alert: RateLimitExceeded
+        expr: rate(rate_limit_exceeded_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: info
+          service: mcp-server
+          team: security
+        annotations:
+          summary: "Rate limit frequently exceeded"
+          description: "Rate limit exceeded {{ $value }} times/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/rate-limit"
+          action: "Review rate limit settings and client behavior"
+
+      # Database Alerts
+      - alert: RedisConnectionFailure
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis connection failure"
+          description: "Redis server {{ $labels.instance }} is unreachable"
+          runbook_url: "https://docs.yc-2025.com/runbooks/redis-down"
+          action: "Check Redis service and restart if necessary"
+
+      - alert: PostgreSQLConnectionFailure
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+          team: infrastructure
+        annotations:
+          summary: "PostgreSQL connection failure"
+          description: "PostgreSQL server {{ $labels.instance }} is unreachable"
+          runbook_url: "https://docs.yc-2025.com/runbooks/postgres-down"
+          action: "Check PostgreSQL service and restart if necessary"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+          team: infrastructure
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/redis-memory"
+          action: "Clear expired keys or increase Redis memory limit"
+
+  - name: yc-php-analysis.business
+    rules:
+      # Business Logic Alerts
+      - alert: AnalysisRequestVolumeHigh
+        expr: rate(php_analysis_request_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: info
+          service: mcp-server
+          team: product
+        annotations:
+          summary: "High analysis request volume"
+          description: "Analysis requests at {{ $value }}/sec, consider scaling"
+          runbook_url: "https://docs.yc-2025.com/runbooks/high-volume"
+          action: "Monitor performance and consider auto-scaling"
+
+      - alert: AnalysisQueueBacklog
+        expr: php_analysis_queue_size > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: performance
+        annotations:
+          summary: "Analysis queue backlog building up"
+          description: "Queue size is {{ $value }} items on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/queue-backlog"
+          action: "Scale workers or investigate processing delays"
+
+      - alert: LowAnalysisSuccessRate
+        expr: (rate(php_analysis_request_total{status="success"}[5m]) / rate(php_analysis_request_total[5m])) < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: development
+        annotations:
+          summary: "Low analysis success rate"
+          description: "Success rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.yc-2025.com/runbooks/low-success-rate"
+          action: "Review failed analysis logs and fix issues"
+
+  - name: yc-php-analysis.slo
+    rules:
+      # SLO/SLA Alerts
+      - alert: SLOErrorBudgetExhausted
+        expr: (1 - (rate(php_analysis_request_total{status="success"}[7d]) / rate(php_analysis_request_total[7d]))) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          service: mcp-server
+          team: sre
+        annotations:
+          summary: "SLO error budget exhausted"
+          description: "Error budget for 7-day window is exhausted (99.9% availability SLO)"
+          runbook_url: "https://docs.yc-2025.com/runbooks/slo-breach"
+          action: "Implement immediate fixes to restore service reliability"
+
+      - alert: LatencySLOBreach
+        expr: histogram_quantile(0.95, rate(php_analysis_request_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: mcp-server
+          team: performance
+        annotations:
+          summary: "Latency SLO breach"
+          description: "95th percentile latency {{ $value }}s exceeds 1s SLO"
+          runbook_url: "https://docs.yc-2025.com/runbooks/latency-slo"
+          action: "Investigate performance issues and optimize"

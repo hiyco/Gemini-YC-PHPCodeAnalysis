@@ -1,0 +1,277 @@
+# Release Pipeline for YC-PHP-Code-Analysis MCP Server
+# Copyright: YC-2025Copyright
+# Description: Automated release pipeline with semantic versioning
+
+name: Release Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+      - 'CHANGELOG.md'
+      - 'src/**'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+
+jobs:
+  # 自动版本检测
+  version-check:
+    name: Version Check
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.version.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: version
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' package.json)
+          PREVIOUS_VERSION=$(git show HEAD~1:package.json | jq -r '.version')
+          
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version unchanged: $CURRENT_VERSION"
+          fi
+
+  # 自动版本升级
+  auto-version:
+    name: Auto Version Bump
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Release Bot"
+          git config --global user.email "release-bot@yc-2025.com"
+
+      - name: Bump version
+        run: |
+          npm version ${{ github.event.inputs.release_type }} --no-git-tag-version
+          NEW_VERSION=$(jq -r '.version' package.json)
+          echo "NEW_VERSION=v$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Update changelog
+        run: |
+          VERSION=$(jq -r '.version' package.json)
+          DATE=$(date +%Y-%m-%d)
+          
+          # Create new changelog entry
+          cat > temp_changelog.md << EOF
+          # Changelog
+          
+          ## [$VERSION] - $DATE
+          
+          ### Added
+          - Version $VERSION release
+          
+          ### Changed
+          - Automated release process
+          
+          ### Fixed
+          - Minor bug fixes and improvements
+          
+          EOF
+          
+          # Append existing changelog (skip first line)
+          tail -n +2 CHANGELOG.md >> temp_changelog.md
+          mv temp_changelog.md CHANGELOG.md
+
+      - name: Commit and push changes
+        run: |
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git tag $NEW_VERSION
+          git push origin main
+          git push origin $NEW_VERSION
+
+  # 创建GitHub Release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [version-check]
+    if: needs.version-check.outputs.should_release == 'true' || github.event_name == 'workflow_dispatch'
+    
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.version-check.outputs.version || env.NEW_VERSION }}"
+          
+          # Extract changelog for this version
+          awk "/## \[$VERSION\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.version-check.outputs.tag || env.NEW_VERSION }}
+          release_name: Release ${{ needs.version-check.outputs.tag || env.NEW_VERSION }}
+          body: ${{ steps.changelog.outputs.release_notes }}
+          draft: false
+          prerelease: ${{ contains(needs.version-check.outputs.tag || env.NEW_VERSION, 'alpha') || contains(needs.version-check.outputs.tag || env.NEW_VERSION, 'beta') }}
+
+  # 构建发布资产
+  build-assets:
+    name: Build Release Assets
+    runs-on: ${{ matrix.os }}
+    needs: [create-release]
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            asset_name: linux-x64
+          - os: windows-latest
+            asset_name: win-x64
+          - os: macos-latest
+            asset_name: darwin-x64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Package binary (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          npx pkg package.json --targets node18-${{ matrix.asset_name }} --output yc-php-analysis-mcp-${{ matrix.asset_name }}
+          tar -czf yc-php-analysis-mcp-${{ matrix.asset_name }}.tar.gz yc-php-analysis-mcp-${{ matrix.asset_name }} README.md LICENSE
+
+      - name: Package binary (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          npx pkg package.json --targets node18-${{ matrix.asset_name }} --output yc-php-analysis-mcp-${{ matrix.asset_name }}.exe
+          7z a yc-php-analysis-mcp-${{ matrix.asset_name }}.zip yc-php-analysis-mcp-${{ matrix.asset_name }}.exe README.md LICENSE
+
+      - name: Upload Release Asset (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./yc-php-analysis-mcp-${{ matrix.asset_name }}.tar.gz
+          asset_name: yc-php-analysis-mcp-${{ matrix.asset_name }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload Release Asset (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./yc-php-analysis-mcp-${{ matrix.asset_name }}.zip
+          asset_name: yc-php-analysis-mcp-${{ matrix.asset_name }}.zip
+          asset_content_type: application/zip
+
+  # 多渠道发布通知
+  notify-release:
+    name: Release Notifications
+    runs-on: ubuntu-latest
+    needs: [create-release, build-assets]
+    if: success()
+    
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#releases'
+          title: 'New Release Published'
+          message: |
+            🎉 **YC-PHP-Code-Analysis MCP Server** has been released!
+            
+            **Version:** ${{ needs.version-check.outputs.tag || env.NEW_VERSION }}
+            **Download:** https://github.com/${{ github.repository }}/releases/latest
+            **NPM:** https://www.npmjs.com/package/yc-php-code-analysis-mcp-server
+            **Docker:** ghcr.io/${{ github.repository }}:latest
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Update documentation
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          repository: ${{ github.repository }}-docs
+          event-type: version-update
+          client-payload: '{"version": "${{ needs.version-check.outputs.tag || env.NEW_VERSION }}"}'
+
+      - name: Tweet release
+        uses: ethomson/send-tweet-action@v1
+        if: env.TWITTER_CONSUMER_API_KEY
+        with:
+          status: |
+            🚀 YC-PHP-Code-Analysis MCP Server ${{ needs.version-check.outputs.tag || env.NEW_VERSION }} is now available!
+            
+            ✨ Professional MCP server for PHP code analysis
+            🔧 AI-driven intelligent capabilities  
+            🐳 Docker & Kubernetes ready
+            
+            Download: https://github.com/${{ github.repository }}/releases/latest
+            
+            #PHP #AI #CodeAnalysis #OpenSource
+          consumer-key: ${{ secrets.TWITTER_CONSUMER_API_KEY }}
+          consumer-secret: ${{ secrets.TWITTER_CONSUMER_API_SECRET }}
+          access-token: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          access-token-secret: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}

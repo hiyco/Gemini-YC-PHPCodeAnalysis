@@ -1,0 +1,67 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Copyright: YC-2025Copyright
+ * Created: 2025-09-03
+ * Author: YC
+ * Description: PHP Code Analyzer CLI Entry Point
+ */
+
+// Check PHP version
+if (PHP_VERSION_ID < 80300) {
+    fprintf(STDERR, "PHP 8.3 or higher is required. You are using PHP %s.\n", PHP_VERSION);
+    exit(1);
+}
+
+// Set error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
+// Find autoloader
+$autoloadFiles = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+    __DIR__ . '/../../autoload.php',
+    __DIR__ . '/../autoload.php'
+];
+
+$autoloaderFound = false;
+foreach ($autoloadFiles as $autoloadFile) {
+    if (file_exists($autoloadFile)) {
+        require_once $autoloadFile;
+        $autoloaderFound = true;
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fprintf(
+        STDERR,
+        "Autoloader not found. Please run 'composer install' to install dependencies.\n" .
+        "Looked for autoloader in:\n%s\n",
+        implode("\n", $autoloadFiles)
+    );
+    exit(1);
+}
+
+// Import required classes
+use YcPca\Cli\Application;
+
+try {
+    // Create and run application
+    $application = new Application();
+    $exitCode = $application->run();
+    exit($exitCode);
+    
+} catch (\Throwable $e) {
+    fprintf(STDERR, "Fatal error: %s\n", $e->getMessage());
+    
+    if (isset($_SERVER['PCA_DEBUG']) || in_array('--debug', $argv, true)) {
+        fprintf(STDERR, "Stack trace:\n%s\n", $e->getTraceAsString());
+    }
+    
+    exit(1);
+}

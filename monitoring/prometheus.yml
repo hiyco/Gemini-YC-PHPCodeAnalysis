@@ -1,0 +1,128 @@
+# Prometheus Configuration for YC-PHP-Code-Analysis MCP Server
+# Copyright: YC-2025Copyright
+# Description: Comprehensive monitoring and alerting configuration
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'production'
+    service: 'yc-php-analysis'
+
+rule_files:
+  - "alert_rules.yml"
+  - "recording_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - "alertmanager:9093"
+
+scrape_configs:
+  # YC PHP Analysis MCP Server
+  - job_name: 'yc-php-analysis-mcp'
+    scrape_interval: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['yc-php-analysis-service.yc-php-analysis.svc.cluster.local:9090']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 'yc-php-analysis-service.yc-php-analysis.svc.cluster.local:9090'
+
+  # Application Health Checks
+  - job_name: 'yc-php-analysis-health'
+    scrape_interval: 5s
+    metrics_path: /health
+    static_configs:
+      - targets: ['yc-php-analysis-service.yc-php-analysis.svc.cluster.local:3000']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'http_request_duration_seconds.*'
+        target_label: service
+        replacement: 'mcp-server'
+
+  # Redis Monitoring
+  - job_name: 'redis'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis-service.yc-php-analysis.svc.cluster.local:6379']
+    metrics_path: /metrics
+
+  # PostgreSQL Monitoring
+  - job_name: 'postgres'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['postgres-service.yc-php-analysis.svc.cluster.local:5432']
+    metrics_path: /metrics
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['node-exporter.monitoring.svc.cluster.local:9100']
+
+  # Kubernetes API Server
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Kubernetes Pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+  # Application Performance Monitoring
+  - job_name: 'yc-php-analysis-apm'
+    scrape_interval: 5s
+    metrics_path: /metrics/detailed
+    static_configs:
+      - targets: ['yc-php-analysis-service.yc-php-analysis.svc.cluster.local:9090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(php_analysis_request_duration_seconds|php_analysis_request_total|php_analysis_error_total|php_analysis_active_connections|php_analysis_memory_usage_bytes|php_analysis_cpu_usage_percent)'
+        action: keep
+
+  # Security Monitoring
+  - job_name: 'yc-php-analysis-security'
+    scrape_interval: 30s
+    metrics_path: /security/metrics
+    static_configs:
+      - targets: ['yc-php-analysis-service.yc-php-analysis.svc.cluster.local:9090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(security_scan_total|security_vulnerability_found_total|authentication_failure_total|rate_limit_exceeded_total)'
+        action: keep

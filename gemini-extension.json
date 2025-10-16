@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "mcpServers": {
     "nodeServer": {
-      "command": "node",
+      "command": "ycphp",
       "args": ["${extensionPath}${/}dist${/}index.js"],
       "cwd": "${extensionPath}"
     }
